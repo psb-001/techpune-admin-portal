@@ -4,7 +4,7 @@ import { api } from '../convex/_generated/api';
 import HackathonCard from './components/HackathonCard';
 import HackathonFormModal from './components/HackathonFormModal';
 import Login from './Login';
-import { Plus, Filter, Info, LogOut } from 'lucide-react';
+import { Plus, Filter, LogOut, LayoutDashboard, CalendarDays, MessageSquare, Star, Trash2, Trophy } from 'lucide-react';
 
 const CATEGORIES = ['ALL', 'ARTIFICIAL INTELLIGENCE', 'BLOCKCHAIN & WEB3', 'CYBERSECURITY', 'CLIMATE & CLEAN TECH'];
 
@@ -46,6 +46,14 @@ const toArgs = (f) => ({
   isFeatured: f.isFeatured ?? undefined,
 });
 
+const Stars = ({ value }) => (
+  <div className="flex items-center gap-0.5">
+    {[1, 2, 3, 4, 5].map((i) => (
+      <Star key={i} className={`w-3.5 h-3.5 ${value && i <= value ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+    ))}
+  </div>
+);
+
 export default function App() {
   const docs = useQuery(api.hackathons.list);
   const createHackathon = useMutation(api.admin.create);
@@ -55,8 +63,9 @@ export default function App() {
 
   const [token, setToken] = useState(() => localStorage.getItem('tp_admin_token') || '');
   const tokenValid = useQuery(api.auth.validate, token ? { token } : 'skip');
+  const feedback = useQuery(api.feedback.list, token ? { token } : 'skip');
+  const removeFeedback = useMutation(api.feedback.remove);
 
-  // Drop stale/expired sessions.
   useEffect(() => {
     if (token && tokenValid === false) {
       localStorage.removeItem('tp_admin_token');
@@ -70,15 +79,14 @@ export default function App() {
     setToken('');
   };
 
+  const [view, setView] = useState('dashboard');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
 
   const hackathons = (docs ?? []).map(fromDoc);
 
-  if (!token) {
-    return <Login onLogin={setToken} />;
-  }
+  if (!token) return <Login onLogin={setToken} />;
 
   const handleSaveHackathon = async (hackathonData) => {
     try {
@@ -98,141 +106,188 @@ export default function App() {
     }
   };
 
-  const handleOpenEdit = (hackathon) => {
-    setEditingHackathon(hackathon);
-    setIsModalOpen(true);
-  };
+  const handleOpenEdit = (hackathon) => { setEditingHackathon(hackathon); setIsModalOpen(true); };
+  const handleOpenAdd = () => { setEditingHackathon(null); setIsModalOpen(true); };
 
-  const handleOpenAdd = () => {
-    setEditingHackathon(null);
-    setIsModalOpen(true);
-  };
+  const filteredHackathons = hackathons.filter(h => selectedCategory === 'ALL' || h.category === selectedCategory);
 
-  const filteredHackathons = hackathons.filter(h => {
-    return selectedCategory === 'ALL' || h.category === selectedCategory;
-  });
+  const upcoming = hackathons.filter((h) => h.status === 'Upcoming').length;
+  const ongoing = hackathons.filter((h) => h.status === 'Ongoing').length;
+  const avgRating = feedback && feedback.length
+    ? (feedback.reduce((s, f) => s + (f.rating || 0), 0) / feedback.filter((f) => f.rating).length).toFixed(1)
+    : '—';
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'hackathons', label: 'Hackathons', icon: CalendarDays },
+    { id: 'feedback', label: `Feedback${feedback ? ` · ${feedback.length}` : ''}`, icon: MessageSquare },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#111827] flex flex-col font-sans antialiased">
-      
-      {/* 1. Aligned Sticky Header */}
-      <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-          
-          {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full border-[3px] border-[#2DD4BF] bg-[#ECFDF5] flex items-center justify-center shadow-xs shrink-0">
-              <div className="w-4 h-4 rounded-full bg-[#0D9488]" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 font-['Syne']">
-                Hackathon Portal
-              </h1>
-              <p className="text-xs text-gray-500 font-semibold">Team Hackathon Insert & Tracking Dashboard</p>
-            </div>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased">
+      {/* Sidebar */}
+      <aside className="w-60 bg-slate-900 text-white flex flex-col sticky top-0 h-screen shrink-0">
+        <div className="p-6 flex items-center gap-3">
+          <img src="favicon.png" alt="HackLoop logo" className="w-9 h-9 rounded-full" />
+          <div>
+            <h1 className="text-lg font-black font-['Syne']">HackLoop</h1>
+            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Admin</p>
           </div>
-
-          {/* Logout + Insert Hackathon Button */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleLogout}
-              title="Log out"
-              className="px-3 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 text-xs font-bold flex items-center gap-1.5 transition-all"
-            >
-              <LogOut className="w-4 h-4" /> Log out
-            </button>
-            <button
-              onClick={handleOpenAdd}
-              className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm active:scale-95 transition-all shrink-0"
-            >
-              <Plus className="w-4 h-4" /> Insert Hackathon
-            </button>
-          </div>
-
         </div>
-      </header>
-
-      {/* 2. Main Aligned Content Body */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        
-        {/* Category Selection Bar */}
-        <div className="bg-white p-4 rounded-3xl border border-gray-200/90 shadow-xs flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider px-2 shrink-0 flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-teal-600" /> Category:
-          </span>
-          {CATEGORIES.map(cat => (
+        <nav className="px-3 py-4 space-y-1 flex-1">
+          {navItems.map(({ id, label, icon: Icon }) => (
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all ${
-                selectedCategory === cat
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200/60'
+              key={id}
+              onClick={() => setView(id)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                view === id ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              {cat}
+              <Icon className="w-4 h-4" /> {label}
             </button>
           ))}
-        </div>
+        </nav>
+        <button
+          onClick={handleLogout}
+          className="m-4 flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+        >
+          <LogOut className="w-4 h-4" /> Log out
+        </button>
+      </aside>
 
-        {/* Section Counter Header */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-            All Hackathons ({filteredHackathons.length})
-          </span>
-          <span className="text-xs text-gray-400">
-            {docs === undefined ? 'Connecting to backend…' : 'Live from Convex'}
-          </span>
-        </div>
-
-        {/* 3. Perfectly Aligned Hackathon Cards Grid */}
-        {docs === undefined ? (
-          <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 my-8">
-            <p className="text-xs text-gray-500">Loading hackathons…</p>
-          </div>
-        ) : filteredHackathons.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch justify-center">
-            {filteredHackathons.map(hackathon => (
-              <div key={hackathon.id} className="w-full flex">
-                <HackathonCard
-                  hackathon={hackathon}
-                  onEdit={handleOpenEdit}
-                  onDelete={handleDeleteHackathon}
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 my-8 space-y-3">
-            <Info className="w-8 h-8 text-gray-400 mx-auto" />
-            <h3 className="text-lg font-bold text-slate-900">No Hackathons Found</h3>
-            <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              No hackathons found in this category. Click below to insert a new hackathon event.
-            </p>
+      {/* Main */}
+      <main className="flex-1 min-w-0">
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-20 flex items-center justify-between px-8 py-4">
+          <h2 className="text-xl font-black text-slate-900">
+            {view === 'dashboard' ? 'Dashboard' : view === 'hackathons' ? 'Hackathons' : 'Feedback'}
+          </h2>
+          {view === 'hackathons' && (
             <button
               onClick={handleOpenAdd}
-              className="px-4 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs"
+              className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm active:scale-95 transition-all"
             >
-              <Plus className="w-4 h-4" /> Insert Hackathon
+              <Plus className="w-4 h-4" /> Add Hackathon
             </button>
-          </div>
-        )}
+          )}
+        </header>
 
+        <div className="p-8 space-y-6">
+          {view === 'dashboard' && (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total hackathons', value: hackathons.length },
+                  { label: 'Upcoming', value: upcoming },
+                  { label: 'Ongoing', value: ongoing },
+                  { label: 'Avg. rating', value: avgRating },
+                ].map((s) => (
+                  <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-5">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
+                    <p className="text-3xl font-black mt-2">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-black text-slate-900 mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-teal-600" /> Latest hackathons</h3>
+                {docs === undefined ? (
+                  <p className="text-xs text-slate-400">Loading…</p>
+                ) : hackathons.slice(0, 5).map((h) => (
+                  <div key={h.id} className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
+                    <div>
+                      <p className="font-bold text-sm">{h.title}</p>
+                      <p className="text-xs text-slate-400">{h.organizer} · {h.category}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                      h.status === 'Ongoing' ? 'bg-emerald-50 text-emerald-700' :
+                      h.status === 'Completed' ? 'bg-slate-100 text-slate-500' :
+                      h.status === 'Cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-700'
+                    }`}>{h.status}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {view === 'hackathons' && (
+            <>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-2 overflow-x-auto">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 shrink-0 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-teal-600" /> Category:
+                </span>
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all ${
+                      selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                All Hackathons ({filteredHackathons.length}) · {docs === undefined ? 'Connecting to backend…' : 'Live from Convex'}
+              </p>
+              {docs === undefined ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-slate-200"><p className="text-xs text-slate-400">Loading hackathons…</p></div>
+              ) : filteredHackathons.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {filteredHackathons.map((h) => (
+                    <HackathonCard key={h.id} hackathon={h} onEdit={handleOpenEdit} onDelete={handleDeleteHackathon} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-3">
+                  <h3 className="text-lg font-bold text-slate-900">No hackathons</h3>
+                  <p className="text-xs text-slate-400">Nothing in this category yet.</p>
+                  <button onClick={handleOpenAdd} className="px-4 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-xs inline-flex items-center gap-1.5">
+                    <Plus className="w-4 h-4" /> Add Hackathon
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {view === 'feedback' && (
+            <div className="space-y-4">
+              {feedback === undefined ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-slate-200"><p className="text-xs text-slate-400">Loading feedback…</p></div>
+              ) : feedback.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+                  <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-500">No feedback yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Feedback sent from the Android app appears here.</p>
+                </div>
+              ) : feedback.map((f) => (
+                <div key={f._id} className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Stars value={f.rating} />
+                      <span className="text-xs text-slate-400">· {new Date(f.createdAt).toLocaleString()}</span>
+                    </div>
+                    <button
+                      onClick={() => window.confirm('Delete this feedback?') && removeFeedback({ id: f._id, token })}
+                      className="text-slate-300 hover:text-rose-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-slate-700">{f.message}</p>
+                  <p className="text-xs text-slate-400 mt-2">{f.name ? `— ${f.name}` : '— Anonymous'}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-6 text-center text-xs font-medium text-gray-500 mt-12">
-        Team Hackathon Dashboard &copy; 2026
-      </footer>
-
-      {/* Insert / Edit Form Modal */}
       <HackathonFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveHackathon}
         editingHackathon={editingHackathon}
       />
-
     </div>
   );
 }

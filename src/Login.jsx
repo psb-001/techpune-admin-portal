@@ -33,12 +33,10 @@ export default function Login({ onLogin }) {
     <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center px-4">
       <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-3xl shadow-xs p-8 w-full max-w-sm space-y-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-[3px] border-[#2DD4BF] bg-[#ECFDF5] flex items-center justify-center shadow-xs shrink-0">
-            <div className="w-4 h-4 rounded-full bg-[#0D9488]" />
-          </div>
+          <img src="favicon.png" alt="HackLoop logo" className="w-10 h-10 rounded-full shadow-xs shrink-0" />
           <div>
             <h1 className="text-xl font-black text-slate-900 font-['Syne']">Admin Login</h1>
-            <p className="text-xs text-gray-500 font-semibold">Hackathon Portal</p>
+            <p className="text-xs text-gray-500 font-semibold">HackLoop</p>
           </div>
         </div>
 
