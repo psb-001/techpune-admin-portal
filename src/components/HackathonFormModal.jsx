@@ -7,10 +7,13 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
     category: 'ARTIFICIAL INTELLIGENCE',
     organizer: '',
     date: '',
+    startsOn: '',
+    endsOn: '',
     location: '',
     prizePool: '',
     description: '',
     registrationDeadline: '',
+    deadlineDate: '',
     websiteUrl: ''
   });
 
@@ -21,10 +24,13 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
         category: editingHackathon.category || 'ARTIFICIAL INTELLIGENCE',
         organizer: editingHackathon.organizer || '',
         date: editingHackathon.date || '',
+        startsOn: editingHackathon.startsOn || '',
+        endsOn: editingHackathon.endsOn || '',
         location: editingHackathon.location || '',
         prizePool: editingHackathon.prizePool || '',
         description: editingHackathon.description || '',
         registrationDeadline: editingHackathon.registrationDeadline || '',
+        deadlineDate: editingHackathon.deadlineDate || '',
         websiteUrl: editingHackathon.websiteUrl || ''
       });
     } else {
@@ -33,10 +39,13 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
         category: 'ARTIFICIAL INTELLIGENCE',
         organizer: '',
         date: '',
+        startsOn: '',
+        endsOn: '',
         location: '',
         prizePool: '',
         description: '',
         registrationDeadline: '',
+        deadlineDate: '',
         websiteUrl: ''
       });
     }
@@ -55,10 +64,15 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
       alert('Please fill out Title and Organizer Name');
       return;
     }
+    if (!formData.startsOn || !formData.endsOn || !formData.deadlineDate) {
+      alert('Starts On, Ends On and Deadline are required — the app counts down from them.');
+      return;
+    }
 
     onSave({
       id: editingHackathon ? editingHackathon.id : `hack-${Date.now()}`,
-      ...formData
+      ...formData,
+      endsOn: formData.endsOn || formData.startsOn,
     });
 
     onClose();
@@ -157,7 +171,38 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                Date Range
+                Starts On *
+              </label>
+              <input
+                type="date"
+                name="startsOn"
+                required
+                value={formData.startsOn}
+                onChange={handleChange}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                Ends On *
+              </label>
+              <input
+                type="date"
+                name="endsOn"
+                required
+                value={formData.endsOn}
+                onChange={handleChange}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Display date text & Location */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                Date Display Text
               </label>
               <input
                 type="text"
@@ -203,7 +248,21 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                Registration Deadline Text
+                Registration Deadline *
+              </label>
+              <input
+                type="date"
+                name="deadlineDate"
+                required
+                value={formData.deadlineDate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-900 focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                Deadline Display Text
               </label>
               <input
                 type="text"
@@ -214,20 +273,21 @@ export default function HackathonFormModal({ isOpen, onClose, onSave, editingHac
                 className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-900 focus:border-teal-500 focus:outline-none"
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                Website Link
-              </label>
-              <input
-                type="url"
-                name="websiteUrl"
-                placeholder="https://example.com/hackathon"
-                value={formData.websiteUrl}
-                onChange={handleChange}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-900 focus:border-teal-500 focus:outline-none"
-              />
-            </div>
+          {/* Website Link */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+              Website Link
+            </label>
+            <input
+              type="url"
+              name="websiteUrl"
+              placeholder="https://example.com/hackathon"
+              value={formData.websiteUrl}
+              onChange={handleChange}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-900 focus:border-teal-500 focus:outline-none"
+            />
           </div>
 
           {/* Footer Actions */}

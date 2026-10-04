@@ -1,53 +1,100 @@
 import React, { useState, useEffect } from 'react';
-import { INITIAL_HACKATHONS } from './data/initialHackathons';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../convex/_generated/api';
 import HackathonCard from './components/HackathonCard';
 import HackathonFormModal from './components/HackathonFormModal';
-import { Plus, Filter, Info } from 'lucide-react';
+import Login from './Login';
+import { Plus, Filter, Info, LogOut } from 'lucide-react';
 
 const CATEGORIES = ['ALL', 'ARTIFICIAL INTELLIGENCE', 'BLOCKCHAIN & WEB3', 'CYBERSECURITY', 'CLIMATE & CLEAN TECH'];
 
+// --- Boundary mappers: the cards speak the portal's display shape, Convex
+// speaks ISO dates. Both directions translate here so neither side changes.
+
+const fromDoc = (d) => ({
+  id: d._id,
+  title: d.title,
+  category: (d.tag || '').toUpperCase(),
+  organizer: d.organizer,
+  date: d.dateDisplay || `${d.startsOn} - ${d.endsOn}`,
+  location: d.location,
+  prizePool: d.prize,
+  description: d.description,
+  registrationDeadline: d.deadlineDisplay || `Registration closes on ${d.deadline}`,
+  deadlineDate: d.deadline,
+  status: d.status || 'Upcoming',
+  isFeatured: d.isFeatured ?? false,
+  websiteUrl: d.websiteUrl || '',
+  startsOn: d.startsOn,
+  endsOn: d.endsOn,
+});
+
+const toArgs = (f) => ({
+  title: f.title,
+  organizer: f.organizer,
+  description: f.description || '',
+  location: f.location || '',
+  startsOn: f.startsOn || '',
+  endsOn: f.endsOn || f.startsOn || '',
+  deadline: f.deadlineDate || '',
+  prize: f.prizePool || '',
+  tag: (f.category || '').toLowerCase().replace(/^./, (c) => c.toUpperCase()),
+  dateDisplay: f.date || undefined,
+  deadlineDisplay: f.registrationDeadline || undefined,
+  websiteUrl: f.websiteUrl || undefined,
+  status: f.status || undefined,
+  isFeatured: f.isFeatured ?? undefined,
+});
+
 export default function App() {
-  const [hackathons, setHackathons] = useState(() => {
-    try {
-      const saved = localStorage.getItem('team_hackathons');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error(e);
+  const docs = useQuery(api.hackathons.list);
+  const createHackathon = useMutation(api.admin.create);
+  const updateHackathon = useMutation(api.admin.update);
+  const removeHackathon = useMutation(api.admin.remove);
+  const logout = useMutation(api.auth.logout);
+
+  const [token, setToken] = useState(() => localStorage.getItem('tp_admin_token') || '');
+  const tokenValid = useQuery(api.auth.validate, token ? { token } : 'skip');
+
+  // Drop stale/expired sessions.
+  useEffect(() => {
+    if (token && tokenValid === false) {
+      localStorage.removeItem('tp_admin_token');
+      setToken('');
     }
-    return INITIAL_HACKATHONS;
-  });
+  }, [token, tokenValid]);
+
+  const handleLogout = async () => {
+    try { await logout({ token }); } catch {}
+    localStorage.removeItem('tp_admin_token');
+    setToken('');
+  };
 
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('team_hackathons', JSON.stringify(hackathons));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [hackathons]);
+  const hackathons = (docs ?? []).map(fromDoc);
 
-  const handleSaveHackathon = (hackathonData) => {
-    setHackathons(prev => {
-      const idx = prev.findIndex(h => h.id === hackathonData.id);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = hackathonData;
-        return updated;
+  if (!token) {
+    return <Login onLogin={setToken} />;
+  }
+
+  const handleSaveHackathon = async (hackathonData) => {
+    try {
+      if (editingHackathon) {
+        await updateHackathon({ id: editingHackathon.id, token, ...toArgs(hackathonData) });
       } else {
-        return [hackathonData, ...prev];
+        await createHackathon({ token, ...toArgs(hackathonData) });
       }
-    });
+    } catch (err) {
+      alert(err?.message?.includes('Unauthorized') ? 'Session expired — log in again.' : String(err));
+    }
   };
 
   const handleDeleteHackathon = (id) => {
     if (window.confirm('Delete this hackathon entry?')) {
-      setHackathons(prev => prev.filter(h => h.id !== id));
+      removeHackathon({ id, token }).catch(() => alert('Session expired — log in again.'));
     }
   };
 
@@ -85,13 +132,22 @@ export default function App() {
             </div>
           </div>
 
-          {/* Insert Hackathon Button */}
-          <button
-            onClick={handleOpenAdd}
-            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm active:scale-95 transition-all shrink-0"
-          >
-            <Plus className="w-4 h-4" /> Insert Hackathon
-          </button>
+          {/* Logout + Insert Hackathon Button */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleLogout}
+              title="Log out"
+              className="px-3 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 text-xs font-bold flex items-center gap-1.5 transition-all"
+            >
+              <LogOut className="w-4 h-4" /> Log out
+            </button>
+            <button
+              onClick={handleOpenAdd}
+              className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm active:scale-95 transition-all shrink-0"
+            >
+              <Plus className="w-4 h-4" /> Insert Hackathon
+            </button>
+          </div>
 
         </div>
       </header>
@@ -125,12 +181,16 @@ export default function App() {
             All Hackathons ({filteredHackathons.length})
           </span>
           <span className="text-xs text-gray-400">
-            Matching layout design from image
+            {docs === undefined ? 'Connecting to backend…' : 'Live from Convex'}
           </span>
         </div>
 
         {/* 3. Perfectly Aligned Hackathon Cards Grid */}
-        {filteredHackathons.length > 0 ? (
+        {docs === undefined ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 my-8">
+            <p className="text-xs text-gray-500">Loading hackathons…</p>
+          </div>
+        ) : filteredHackathons.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch justify-center">
             {filteredHackathons.map(hackathon => (
               <div key={hackathon.id} className="w-full flex">
